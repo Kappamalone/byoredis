@@ -22,7 +22,10 @@ int main(int argc, char **argv) {
       return 1;
     }
   } else {
-    byoredis::Client::dummy();
+    byoredis::Client client{};
+    client.connect(INADDR_LOOPBACK, 3000);
+    client.dummy();
+    client.close();
   }
   return 0;
 }

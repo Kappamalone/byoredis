@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdio>
+#include "common.hpp"
 #include <cstring>
+#include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -9,38 +10,26 @@
 namespace byoredis {
 
 class Client {
-
 public:
-  // copied verbatim from build-your-own-redis
-  static void dummy() {
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-      return;
-    }
+  Client();
+  ResultVoid connect(int32_t host, int16_t port);
+  void close();
 
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(3000);
-    addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK); // 127.0.0.1
-    int err = connect(fd, (const struct sockaddr *)&addr, sizeof(addr));
-    if (err) {
-      printf("oh no! 2");
-      return;
-    }
-
+  // placeholder
+  void dummy() {
     char msg[] = "hello";
-    write(fd, msg, strlen(msg));
+    write(server_fd.get(), msg, strlen(msg));
 
     char rbuf[64] = {};
-    ssize_t n = read(fd, rbuf, sizeof(rbuf) - 1);
+    ssize_t n = read(server_fd.get(), rbuf, sizeof(rbuf) - 1);
     if (n < 0) {
       return;
     }
-    printf("server says: %s\n", rbuf);
-    close(fd);
+    std::cout << "server says: " << rbuf << "\n";
   }
 
 private:
+  UniqueFd server_fd;
 };
 
 } // namespace byoredis
