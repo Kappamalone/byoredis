@@ -1,6 +1,8 @@
 #pragma once
 
 #include "common.hpp"
+#include <sys/poll.h>
+#include <vector>
 
 namespace byoredis {
 
@@ -18,8 +20,10 @@ public:
   ResultVoid listen();
 
 private:
+  std::vector<pollfd> construct_polls();
+
   int16_t port;
-  UniqueFd socket_fd;
+  UniqueFd listen_fd;
 };
 
 } // namespace byoredis

@@ -1,8 +1,9 @@
 #include "server.hpp"
 #include <iostream>
 #include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#include <sys/poll.h>
+
+namespace byoredis {
 
 namespace {
 
@@ -19,9 +20,19 @@ void do_something(int connfd) {
   write(connfd, wbuf, strlen(wbuf));
 }
 
-} // namespace
+ResultVoid set_nonblocking(int fd) {
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags == -1) {
+    return err("Couldn't get flags for fd");
+  }
+  if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+    return err("Couldn't set fd to non blocking");
+  }
 
-namespace byoredis {
+  return ok();
+}
+
+} // namespace
 
 Server::Server(int16_t port) : port(port) {}
 
@@ -46,36 +57,62 @@ ResultVoid Server::bind() {
     return err("Failed to bind");
   }
 
-  socket_fd = std::move(fd);
+  listen_fd = std::move(fd);
   return ok();
 }
 
 ResultVoid Server::listen() {
-  if (socket_fd == -1) {
+  if (listen_fd == -1) {
     return err("Socket not initialised");
   }
 
+  if (auto e = set_nonblocking(listen_fd.get())) {
+    return e;
+  }
+
   // TODO: is it okay to call listen multiple times?
-  int res = ::listen(socket_fd.get(), SOMAXCONN);
+  int res = ::listen(listen_fd.get(), SOMAXCONN);
   if (res == -1) {
     return err("Failed to listen on socket");
   }
 
   // TODO: graceful shutdown?
   while (true) {
-    struct sockaddr_in client_addr {};
-    socklen_t addr_len = sizeof(client_addr);
-    int client_fd =
-        accept(socket_fd.get(), (struct sockaddr *)&client_addr, &addr_len);
-    if (client_fd < 0) {
-      return err("Failed to accept client connection");
-    }
 
-    do_something(client_fd);
-    close(client_fd);
+    std::vector<pollfd> poll_args = construct_polls();
+    poll(poll_args.data(), (nfds_t)poll_args.size(), -1);
+
+    // handle listen socket specifically
+    if (poll_args[0].revents & POLLIN) {
+      std::cout << "got a connection request!\n";
+
+      struct sockaddr_in client_addr {};
+      socklen_t addr_len = sizeof(client_addr);
+      UniqueFd client_fd{::accept(listen_fd.get(),
+                                  (struct sockaddr *)&client_addr, &addr_len)};
+
+      if (client_fd == -1) {
+        std::cerr << "Failed to accept client connection\n";
+        continue;
+      }
+
+      if (auto e = set_nonblocking(client_fd.get())) {
+        std::cerr << "client fd: " << *e << "\n";
+        continue;
+      }
+
+      do_something(client_fd.get());
+      close(client_fd.get());
+    }
   }
 
   return ok();
+}
+
+std::vector<pollfd> Server::construct_polls() {
+  std::vector<pollfd> ret;
+  ret.push_back({listen_fd.get(), POLL_IN, 0});
+  return ret;
 }
 
 } // namespace byoredis

@@ -1,7 +1,10 @@
 #pragma once
 
+#include <fcntl.h>
 #include <optional>
+#include <poll.h>
 #include <string>
+#include <sys/fcntl.h>
 #include <unistd.h>
 
 namespace byoredis {
@@ -15,7 +18,7 @@ template <typename T> inline ResultVoid err(T &&e) {
   return std::make_optional<std::string>(std::forward<T>(e));
 }
 
-// RAII wrapper around fd's
+// RAII wrapper around fd's + convenience methods
 // Prevents us from having to do something like `std::optional<int>`
 class UniqueFd {
 public:
