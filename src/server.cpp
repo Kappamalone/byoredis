@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "conn.hpp"
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/poll.h>
@@ -8,6 +9,7 @@ namespace byoredis {
 namespace {
 
 // copied verbatim from build-your-own-redis
+/*
 void do_something(int connfd) {
   char rbuf[64] = {};
   ssize_t n = read(connfd, rbuf, sizeof(rbuf) - 1);
@@ -19,6 +21,7 @@ void do_something(int connfd) {
   char wbuf[] = "world";
   write(connfd, wbuf, strlen(wbuf));
 }
+*/
 
 ResultVoid set_nonblocking(int fd) {
   int flags = fcntl(fd, F_GETFL, 0);
@@ -101,8 +104,25 @@ ResultVoid Server::listen() {
         continue;
       }
 
-      do_something(client_fd.get());
-      close(client_fd.get());
+      // create connection, create mapping between fd and connection
+      int fd = client_fd.get();
+      fd_to_connection.emplace(fd, std::move(client_fd));
+      // do_something(client_fd.get());
+      // close(client_fd.get());
+    }
+
+    for (size_t i = 1; i < poll_args.size(); ++i) {
+      uint32_t revents = (uint32_t)poll_args[i].revents;
+      Conn &conn = fd_to_connection.at(poll_args[i].fd);
+
+      if ((revents & POLLIN) || (revents & POLLOUT)) {
+        conn.handle();
+      }
+
+      if ((revents & POLLERR) || conn.is_closed()) {
+        conn.close();
+        fd_to_connection.erase(poll_args[i].fd);
+      }
     }
   }
 
@@ -112,6 +132,10 @@ ResultVoid Server::listen() {
 std::vector<pollfd> Server::construct_polls() {
   std::vector<pollfd> ret;
   ret.push_back({listen_fd.get(), POLL_IN, 0});
+
+  for (const auto &[_, conn] : fd_to_connection) {
+    ret.push_back(conn.construct_poll());
+  }
   return ret;
 }
 

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "common.hpp"
+#include "conn.hpp"
 #include <sys/poll.h>
+#include <unordered_map>
 #include <vector>
 
 namespace byoredis {
@@ -24,6 +26,7 @@ private:
 
   int16_t port;
   UniqueFd listen_fd;
+  std::unordered_map<int, Conn> fd_to_connection;
 };
 
 } // namespace byoredis
