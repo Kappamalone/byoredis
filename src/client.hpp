@@ -18,7 +18,10 @@ public:
   // placeholder
   void dummy() {
     char msg[] = "hello";
-    write(server_fd.get(), msg, strlen(msg));
+    std::cout << "msg len: " << strlen(msg) << "\n";
+    size_t size = strlen(msg);
+    write(server_fd.get(), &size, sizeof(size));
+    write(server_fd.get(), msg, size);
 
     char rbuf[64] = {};
     ssize_t n = read(server_fd.get(), rbuf, sizeof(rbuf) - 1);

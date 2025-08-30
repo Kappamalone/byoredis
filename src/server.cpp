@@ -104,23 +104,20 @@ ResultVoid Server::listen() {
         continue;
       }
 
-      // create connection, create mapping between fd and connection
       int fd = client_fd.get();
       fd_to_connection.emplace(fd, std::move(client_fd));
-      // do_something(client_fd.get());
-      // close(client_fd.get());
     }
 
     for (size_t i = 1; i < poll_args.size(); ++i) {
-      uint32_t revents = (uint32_t)poll_args[i].revents;
+      uint32_t ready = (uint32_t)poll_args[i].revents;
       Conn &conn = fd_to_connection.at(poll_args[i].fd);
 
-      if ((revents & POLLIN) || (revents & POLLOUT)) {
+      // something requested has been set
+      if (ready & (uint32_t)poll_args[i].events) {
         conn.handle();
       }
 
-      if ((revents & POLLERR) || conn.is_closed()) {
-        conn.close();
+      if ((ready & POLLERR) || conn.is_closed()) {
         fd_to_connection.erase(poll_args[i].fd);
       }
     }
