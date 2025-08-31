@@ -1,10 +1,14 @@
 #pragma once
 
 #include "common.hpp"
+#include <cstddef>
 #include <sys/poll.h>
 #include <variant>
+#include <vector>
 
 namespace byoredis {
+
+constexpr uint32_t MAX_MSG_SIZE = 4096;
 
 class Conn;
 
@@ -58,6 +62,8 @@ public:
 private:
   UniqueFd client_fd;
   ConnState state;
+  std::vector<std::byte> read_buffer;
+  std::vector<std::byte> write_buffer;
 
   friend struct State::Reading;
   friend struct State::Writing;

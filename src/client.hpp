@@ -17,7 +17,7 @@ public:
 
   // placeholder
   void dummy() {
-    char msg[] = "hello";
+    char msg[] = "hi";
     std::cout << "msg len: " << strlen(msg) << "\n";
     size_t size = strlen(msg);
     write(server_fd.get(), &size, sizeof(size));
@@ -28,7 +28,7 @@ public:
     if (n < 0) {
       return;
     }
-    std::cout << "server says: " << rbuf << "\n";
+    std::cout << "server says: " << rbuf + sizeof(size_t) << "\n";
   }
 
 private:
