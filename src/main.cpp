@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   } else {
     byoredis::Client client{};
     client.connect(INADDR_LOOPBACK, 3000);
-    client.dummy();
+    client.dummy2();
     client.close();
   }
   return 0;

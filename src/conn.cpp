@@ -24,23 +24,28 @@ ConnState Reading::handle() {
 
   conn->read_buffer.insert(conn->read_buffer.end(), tmp, tmp + bytes_read);
 
-  if (conn->read_buffer.size() < sizeof(size_t)) {
-    return *this;
-  }
+  // decode messages in a loop to handle pipelined requests
+  while (conn->read_buffer.size() >= sizeof(size_t)) {
+    if (conn->read_buffer.size() < sizeof(size_t)) {
+      return *this;
+    }
 
-  size_t msg_size;
-  std::memcpy(&msg_size, conn->read_buffer.data(), sizeof(msg_size));
-  if (conn->read_buffer.size() - sizeof(size_t) < msg_size) {
-    return *this;
-  }
+    size_t msg_size;
+    std::memcpy(&msg_size, conn->read_buffer.data(), sizeof(msg_size));
+    if (conn->read_buffer.size() - sizeof(size_t) < msg_size) {
+      return *this;
+    }
 
-  // consume from read buffer and place into write buffer
-  conn->write_buffer.insert(conn->write_buffer.end(), conn->read_buffer.begin(),
+    // TODO: application logic
+
+    // consume from read buffer and place into write buffer
+    conn->write_buffer.insert(
+        conn->write_buffer.end(), conn->read_buffer.begin(),
+        conn->read_buffer.begin() + sizeof(size_t) + msg_size);
+    conn->read_buffer.erase(conn->read_buffer.begin(),
                             conn->read_buffer.begin() + sizeof(size_t) +
                                 msg_size);
-  conn->read_buffer.erase(conn->read_buffer.begin(), conn->read_buffer.begin() +
-                                                         sizeof(size_t) +
-                                                         msg_size);
+  }
   return Writing(conn);
 }
 bool Reading::is_closed() const { return false; }
