@@ -33,9 +33,10 @@ include(Sanitizers)
 
 # Library (core)
 add_library(byoredis_core
-  src/client.cpp
-  src/server.cpp
-  src/conn.cpp
+  src/client/client.cpp
+  src/server/server.cpp
+  src/server/conn.cpp
+  src/server/protocol/stl_wrapper.cpp
 )
 target_include_directories(byoredis_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(byoredis_core PUBLIC cxx_std_23)

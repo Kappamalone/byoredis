@@ -1,5 +1,5 @@
-#include "client.hpp"
-#include "server.hpp"
+#include "./client/client.hpp"
+#include "./server/server.hpp"
 #include <cstring>
 #include <iostream>
 
@@ -24,8 +24,7 @@ int main(int argc, char **argv) {
   } else {
     byoredis::Client client{};
     client.connect(INADDR_LOOPBACK, 3000);
-    client.dummy2();
-    client.close();
+    std::cout << client.get("test").msg << "\n";
   }
   return 0;
 }

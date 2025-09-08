@@ -1,5 +1,6 @@
 #pragma once
 
+#include "./protocol/stl_wrapper.hpp"
 #include "common.hpp"
 #include <cstddef>
 #include <sys/poll.h>
@@ -53,7 +54,7 @@ struct Closed {
 // Represents a connection with a client
 class Conn {
 public:
-  Conn(UniqueFd client_fd);
+  Conn(UniqueFd client_fd, STLWrapper &db);
 
   pollfd construct_poll() const;
   void handle();
@@ -64,6 +65,7 @@ private:
   ConnState state;
   std::vector<std::byte> read_buffer;
   std::vector<std::byte> write_buffer;
+  STLWrapper &db;
 
   friend struct State::Reading;
   friend struct State::Writing;

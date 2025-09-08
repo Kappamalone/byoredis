@@ -27,6 +27,7 @@ private:
   int16_t port;
   UniqueFd listen_fd;
   std::unordered_map<int, Conn> fd_to_connection;
+  STLWrapper db;
 };
 
 } // namespace byoredis

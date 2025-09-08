@@ -8,21 +8,6 @@ namespace byoredis {
 
 namespace {
 
-// copied verbatim from build-your-own-redis
-/*
-void do_something(int connfd) {
-  char rbuf[64] = {};
-  ssize_t n = read(connfd, rbuf, sizeof(rbuf) - 1);
-  if (n < 0) {
-    return;
-  }
-  std::cout << "client says:" << rbuf << "\n";
-
-  char wbuf[] = "world";
-  write(connfd, wbuf, strlen(wbuf));
-}
-*/
-
 ResultVoid set_nonblocking(int fd) {
   int flags = fcntl(fd, F_GETFL, 0);
   if (flags == -1) {
@@ -37,7 +22,7 @@ ResultVoid set_nonblocking(int fd) {
 
 } // namespace
 
-Server::Server(int16_t port) : port(port) {}
+Server::Server(int16_t port) : port{port} {}
 
 ResultVoid Server::bind() {
   // AF_INET vs AF_INET6 : iPv4 vs iPv6
@@ -105,7 +90,7 @@ ResultVoid Server::listen() {
       }
 
       int fd = client_fd.get();
-      fd_to_connection.emplace(fd, std::move(client_fd));
+      fd_to_connection.try_emplace(fd, std::move(client_fd), db);
     }
 
     for (size_t i = 1; i < poll_args.size(); ++i) {
