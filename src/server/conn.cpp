@@ -1,6 +1,6 @@
 #include "conn.hpp"
 #include "common.hpp"
-#include "protocol.hpp"
+#include "redis_handler.hpp"
 #include <cstring>
 #include <iostream>
 #include <unistd.h>
@@ -10,7 +10,7 @@ namespace byoredis {
 
 namespace {
 
-inline void put_be32(std::vector<std::byte> &buf, uint32_t v) {
+inline void put_be32(std::vector<std::byte>& buf, uint32_t v) {
   buf.push_back(static_cast<std::byte>(v >> 24));
   buf.push_back(static_cast<std::byte>(v >> 16));
   buf.push_back(static_cast<std::byte>(v >> 8));
@@ -20,7 +20,7 @@ inline void put_be32(std::vector<std::byte> &buf, uint32_t v) {
 
 namespace State {
 
-Reading::Reading(Conn *conn) : conn(conn) {}
+Reading::Reading(Conn* conn) : conn(conn) {}
 pollfd Reading::construct_poll() const {
   return {.fd = conn->client_fd.get(), .events = POLLIN, .revents = 0};
 }
@@ -43,29 +43,29 @@ ConnState Reading::handle() {
     Response res;
 
     switch (cmd_type) {
-    case Command::GET: {
-      size_t nbytes;
-      std::memcpy(&nbytes, conn->read_buffer.data() + sizeof(Command),
-                  sizeof(nbytes));
-      if (conn->read_buffer.size() - sizeof(Command) - sizeof(size_t) <
-          nbytes) {
-        return *this;
-      }
+      case Command::GET: {
+        size_t nbytes;
+        std::memcpy(&nbytes, conn->read_buffer.data() + sizeof(Command),
+                    sizeof(nbytes));
+        if (conn->read_buffer.size() - sizeof(Command) - sizeof(size_t) <
+            nbytes) {
+          return *this;
+        }
 
-      std::string key(nbytes, ' ');
-      std::memcpy(key.data(),
-                  conn->read_buffer.data() + sizeof(Command) + sizeof(nbytes),
-                  nbytes);
-      std::cout << "got a get cmd: " << key << "\n";
-      res = conn->db.get(key);
-      std::cout << "output: " << res.msg << "\n";
-      conn->read_buffer.erase(conn->read_buffer.begin(),
-                              conn->read_buffer.begin() + sizeof(size_t) +
-                                  sizeof(cmd_type) + nbytes);
-    }
-    case Command::SET:
-    case Command::DELETE:
-      break;
+        std::string key(nbytes, ' ');
+        std::memcpy(key.data(),
+                    conn->read_buffer.data() + sizeof(Command) + sizeof(nbytes),
+                    nbytes);
+        std::cout << "got a get cmd: " << key << "\n";
+        res = conn->db.get(key);
+        std::cout << "output: " << res.msg << "\n";
+        conn->read_buffer.erase(conn->read_buffer.begin(),
+                                conn->read_buffer.begin() + sizeof(size_t) +
+                                    sizeof(cmd_type) + nbytes);
+      }
+      case Command::SET:
+      case Command::DELETE:
+        break;
     }
 
     put_be32(conn->write_buffer, res.msg.size());
@@ -76,7 +76,7 @@ bool Reading::is_closed() const { return false; }
 
 // ==============================================
 
-Writing::Writing(Conn *conn) : conn(conn) {}
+Writing::Writing(Conn* conn) : conn(conn) {}
 pollfd Writing::construct_poll() const {
   return {.fd = conn->client_fd.get(), .events = POLLOUT, .revents = 0};
 }
@@ -112,19 +112,19 @@ bool Closed::is_closed() const { return true; }
 
 } // namespace State
 
-Conn::Conn(UniqueFd client_fd, STLWrapper &db)
+Conn::Conn(UniqueFd client_fd, STLWrapper& db)
     : client_fd(std::move(client_fd)), state(State::Reading(this)), db(db) {}
 
 pollfd Conn::construct_poll() const {
-  return std::visit([](auto &curr) { return curr.construct_poll(); }, state);
+  return std::visit([](auto& curr) { return curr.construct_poll(); }, state);
 }
 
 void Conn::handle() {
-  state = std::visit([](auto &curr) { return curr.handle(); }, state);
+  state = std::visit([](auto& curr) { return curr.handle(); }, state);
 }
 
 bool Conn::is_closed() const {
-  return std::visit([](auto &curr) { return curr.is_closed(); }, state);
+  return std::visit([](auto& curr) { return curr.is_closed(); }, state);
 }
 
 } // namespace byoredis

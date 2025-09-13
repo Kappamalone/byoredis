@@ -3,7 +3,7 @@
 #include <cstring>
 #include <iostream>
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   if (argc != 2) {
     std::cerr << "specify 1 for server, 2 for client\n";
     return 1;

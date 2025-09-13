@@ -1,9 +1,10 @@
 #pragma once
-
 #include <string>
 
-namespace byoredis {
+// define my own protocol, convenient construction of said protocol,
+// and write a parser for it too from a bytestream
 
+namespace byoredis {
 enum class Command {
   GET = 1,
   SET = 2,
@@ -13,15 +14,6 @@ enum class Command {
 struct Response {
   // ...too lazy to specify any sort of status code
   std::string msg;
-};
-
-class IProtocol {
-public:
-  virtual Response get(std::string key) = 0;
-  virtual Response set(std::string key, std::string value) = 0;
-  virtual Response del(std::string key) = 0;
-
-  virtual ~IProtocol() = default;
 };
 
 } // namespace byoredis

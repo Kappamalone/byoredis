@@ -40,7 +40,7 @@ ResultVoid Server::bind() {
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = htonl(0);
-  int res = ::bind(fd.get(), (const struct sockaddr *)&addr, sizeof(addr));
+  int res = ::bind(fd.get(), (const struct sockaddr*)&addr, sizeof(addr));
   if (res == -1) {
     return err("Failed to bind");
   }
@@ -76,8 +76,8 @@ ResultVoid Server::listen() {
 
       struct sockaddr_in client_addr {};
       socklen_t addr_len = sizeof(client_addr);
-      UniqueFd client_fd{::accept(listen_fd.get(),
-                                  (struct sockaddr *)&client_addr, &addr_len)};
+      UniqueFd client_fd{
+          ::accept(listen_fd.get(), (struct sockaddr*)&client_addr, &addr_len)};
 
       if (client_fd == -1) {
         std::cerr << "Failed to accept client connection\n";
@@ -95,7 +95,7 @@ ResultVoid Server::listen() {
 
     for (size_t i = 1; i < poll_args.size(); ++i) {
       uint32_t ready = (uint32_t)poll_args[i].revents;
-      Conn &conn = fd_to_connection.at(poll_args[i].fd);
+      Conn& conn = fd_to_connection.at(poll_args[i].fd);
 
       // something requested has been set
       if (ready & (uint32_t)poll_args[i].events) {
@@ -115,7 +115,7 @@ std::vector<pollfd> Server::construct_polls() {
   std::vector<pollfd> ret;
   ret.push_back({listen_fd.get(), POLL_IN, 0});
 
-  for (const auto &[_, conn] : fd_to_connection) {
+  for (const auto& [_, conn] : fd_to_connection) {
     ret.push_back(conn.construct_poll());
   }
   return ret;

@@ -17,7 +17,7 @@ ResultVoid Client::connect(int32_t host, int16_t port) {
   addr.sin_family = AF_INET;
   addr.sin_port = ntohs(port);
   addr.sin_addr.s_addr = ntohl(host);
-  int res = ::connect(fd.get(), (const struct sockaddr *)&addr, sizeof(addr));
+  int res = ::connect(fd.get(), (const struct sockaddr*)&addr, sizeof(addr));
   if (res) {
     return err("Failed to bind");
   }

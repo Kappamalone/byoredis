@@ -1,13 +1,15 @@
 #pragma once
 
 #include "../protocol.hpp"
+#include "../redis_handler.hpp"
 #include <string>
 #include <unordered_map>
 
 namespace byoredis {
 
 // simple wrapper around std::unordered_map
-class STLWrapper : public IProtocol {
+// TODO: use CRTP instead
+class STLWrapper : public IRedisHandler {
 public:
   STLWrapper();
   ~STLWrapper() = default;
