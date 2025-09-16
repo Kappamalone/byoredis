@@ -9,6 +9,15 @@
 
 namespace byoredis {
 
+// visitor helper
+template <class... Ts>
+struct overloads : Ts... {
+  using Ts::operator()...;
+};
+// explicit deduction guide (not needed as of C++20)
+template <class... Ts>
+overloads(Ts...) -> overloads<Ts...>;
+
 // poor man's result
 using ResultVoid = std::optional<std::string>;
 

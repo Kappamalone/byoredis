@@ -8,15 +8,14 @@
 namespace byoredis {
 
 // simple wrapper around std::unordered_map
-// TODO: use CRTP instead
-class STLWrapper : public IRedisHandler {
+class STLWrapper : public RedisHandler<STLWrapper> {
 public:
   STLWrapper();
   ~STLWrapper() = default;
 
-  Response get(std::string key) override;
-  Response set(std::string key, std::string value) override;
-  Response del(std::string key) override;
+  Response get_impl(std::string key);
+  Response set_impl(std::string key, std::string value);
+  Response del_impl(std::string key);
 
 private:
   std::unordered_map<std::string, std::string> db;

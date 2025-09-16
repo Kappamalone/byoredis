@@ -1,7 +1,9 @@
 #include "client.hpp"
 #include "../server/common.hpp"
+#include "../server/protocol.hpp"
 #include <cstring>
 #include <iostream>
+#include <vector>
 
 namespace byoredis {
 
@@ -32,30 +34,25 @@ ResultVoid Client::connect(int32_t host, int16_t port) {
 // uint32_t num bytes for string
 // ... string bytes
 Response Client::get(std::string key) {
-  std::byte request[1024];
-  Command request_type = Command::GET;
-  std::memcpy(&request, &request_type, sizeof(request_type));
+  GetCommand cmd{.key = key};
+  std::vector<std::byte> payload = serialise(cmd);
+  write(server_fd.get(), payload.data(), payload.size());
 
-  size_t key_len = key.size();
-  std::memcpy(request + sizeof(request_type), &key_len, sizeof(key_len));
-
-  std::memcpy(request + sizeof(request_type) + sizeof(key_len), key.data(),
-              key.size());
-
-  write(server_fd.get(), &request,
-        sizeof(request_type) + sizeof(key_len) + key.size());
-  std::cout << "done!\n";
-
-  std::byte response[1024] = {};
+  std::vector<std::byte> buffer;
+  buffer.resize(1024);
   std::cout << "reading from server\n";
-  ssize_t n = read(server_fd.get(), response, sizeof(response) - 1);
-  std::cout << "done!\n";
+  ssize_t n = read(server_fd.get(), buffer.data(), buffer.size());
   if (n < 0) {
-    return {.msg = "failed to read"};
+    return {.status = Status::ERROR, .msg = "failed to read"};
   }
 
-  std::cout << n << "\n";
-  return {.msg = "woohoo"};
+  auto result = parse_response(buffer);
+  if (std::holds_alternative<Error>(result)) {
+    return {.status = Status::ERROR,
+            .msg = std::move(std::get<Error>(result).msg)};
+  }
+
+  return std::get<Response>(result);
 }
 
 } // namespace byoredis

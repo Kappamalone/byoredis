@@ -1,22 +1,13 @@
 #include "conn.hpp"
 #include "common.hpp"
 #include "redis_handler.hpp"
+#include "server/protocol.hpp"
 #include <cstring>
 #include <iostream>
 #include <unistd.h>
 #include <variant>
 
 namespace byoredis {
-
-namespace {
-
-inline void put_be32(std::vector<std::byte>& buf, uint32_t v) {
-  buf.push_back(static_cast<std::byte>(v >> 24));
-  buf.push_back(static_cast<std::byte>(v >> 16));
-  buf.push_back(static_cast<std::byte>(v >> 8));
-  buf.push_back(static_cast<std::byte>(v));
-}
-} // namespace
 
 namespace State {
 
@@ -36,40 +27,48 @@ ConnState Reading::handle() {
   conn->read_buffer.insert(conn->read_buffer.end(), tmp, tmp + bytes_read);
 
   // decode messages in a loop to handle pipelined requests
-  while (conn->read_buffer.size() >= sizeof(Command) + sizeof(size_t)) {
-    Command cmd_type;
-    std::memcpy(&cmd_type, conn->read_buffer.data(), sizeof(cmd_type));
+  while (!conn->read_buffer.empty()) {
+    auto req = parse_request(conn->read_buffer);
+    enum class Control { Request, Incomplete, Error };
+    Control ctrl = std::visit(
+        overloads{[&](const std::pair<size_t, Request>& req) {
+                    auto [req_size, req_cmd] = req;
+                    Response response = std::visit(
+                        overloads{[&](const GetCommand& cmd) {
+                                    return conn->db.get(cmd.key);
+                                  },
+                                  [&](const SetCommand& cmd) {
+                                    return conn->db.set(cmd.key, cmd.value);
+                                  },
+                                  [&](const DeleteCommand& cmd) {
+                                    return conn->db.del(cmd.key);
+                                  }
 
-    Response res;
+                        },
+                        req_cmd);
 
-    switch (cmd_type) {
-      case Command::GET: {
-        size_t nbytes;
-        std::memcpy(&nbytes, conn->read_buffer.data() + sizeof(Command),
-                    sizeof(nbytes));
-        if (conn->read_buffer.size() - sizeof(Command) - sizeof(size_t) <
-            nbytes) {
-          return *this;
-        }
+                    conn->read_buffer.erase(conn->read_buffer.begin(),
+                                            conn->read_buffer.begin() +
+                                                req_size);
 
-        std::string key(nbytes, ' ');
-        std::memcpy(key.data(),
-                    conn->read_buffer.data() + sizeof(Command) + sizeof(nbytes),
-                    nbytes);
-        std::cout << "got a get cmd: " << key << "\n";
-        res = conn->db.get(key);
-        std::cout << "output: " << res.msg << "\n";
-        conn->read_buffer.erase(conn->read_buffer.begin(),
-                                conn->read_buffer.begin() + sizeof(size_t) +
-                                    sizeof(cmd_type) + nbytes);
-      }
-      case Command::SET:
-      case Command::DELETE:
-        break;
+                    std::vector<std::byte> out = serialise(response);
+                    conn->write_buffer.insert(conn->write_buffer.end(),
+                                              out.begin(), out.end());
+                    return Control::Request;
+                  },
+                  [&](const Incomplete&) { return Control::Incomplete; },
+                  [&](const Error& err) { return Control::Error; }},
+        req);
+    switch (ctrl) {
+      case Control::Request:
+        break; // keep parsing
+      case Control::Incomplete:
+        return *this; // wait for more bytes
+      case Control::Error:
+        return Closed(); // terminate connection
     }
-
-    put_be32(conn->write_buffer, res.msg.size());
   }
+
   return Writing(conn);
 }
 bool Reading::is_closed() const { return false; }

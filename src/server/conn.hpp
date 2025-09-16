@@ -65,7 +65,7 @@ private:
   ConnState state;
   std::vector<std::byte> read_buffer;
   std::vector<std::byte> write_buffer;
-  STLWrapper& db;
+  RedisHandler<STLWrapper>& db;
 
   friend struct State::Reading;
   friend struct State::Writing;
