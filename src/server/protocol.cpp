@@ -2,6 +2,7 @@
 #include "server/common.hpp"
 #include <iostream>
 #include <optional>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -29,6 +30,28 @@ void write_le(std::vector<std::byte>& buffer, T value) {
   }
 }
 
+std::optional<std::pair<size_t, std::string>>
+parse_string(const std::vector<std::byte>& buffer, size_t idx) {
+  size_t initial = idx;
+  auto nbytes = read_le<uint32_t>(buffer, idx);
+  if (!nbytes) {
+    return std::nullopt;
+  }
+  idx += sizeof(uint32_t);
+  if (idx + *nbytes > buffer.size()) {
+    return std::nullopt;
+  }
+  std::string key(reinterpret_cast<const char*>(buffer.data() + idx), *nbytes);
+  idx += *nbytes;
+  return std::make_pair(idx - initial, key);
+}
+
+void serialise_string(std::vector<std::byte>& buffer, std::string_view str) {
+  write_le<uint32_t>(buffer, static_cast<uint32_t>(str.size()));
+  buffer.insert(buffer.end(), reinterpret_cast<const std::byte*>(str.data()),
+                reinterpret_cast<const std::byte*>(str.data() + str.size()));
+}
+
 } // namespace
 
 ParseReqResult parse_request(const std::vector<std::byte>& buffer) {
@@ -52,18 +75,12 @@ ParseReqResult parse_request(const std::vector<std::byte>& buffer) {
 
   switch (static_cast<Command>(*cmd)) {
     case Command::GET: {
-      auto nbytes = read_le<uint32_t>(buffer, idx);
-      if (!nbytes) {
+      auto key_value = parse_string(buffer, idx);
+      if (!key_value) {
         return Incomplete{};
       }
-      idx += sizeof(uint32_t);
-      if (idx + *nbytes > buffer.size()) {
-        return Incomplete{};
-      }
-      std::string key(reinterpret_cast<const char*>(buffer.data() + idx),
-                      *nbytes);
-      idx += *nbytes;
-
+      auto [nbytes, key] = *key_value;
+      idx += nbytes;
       return std::make_pair(idx, GetCommand{.key = std::move(key)});
     }
     case Command::SET:
@@ -85,17 +102,11 @@ ParseResResult parse_response(const std::vector<std::byte>& buffer) {
   }
   idx += sizeof(Response::status);
 
-  auto nbytes = read_le<uint32_t>(buffer, idx);
-  if (!nbytes) {
-    return Error{.msg = "Length of msg missing"};
+  auto value = parse_string(buffer, idx);
+  if (!value) {
+    return Error{.msg = "Failed to parse string"};
   }
-  idx += sizeof(uint32_t);
-  if (idx + *nbytes > buffer.size()) {
-    std::cout << idx + *nbytes << " " << buffer.size() << "\n";
-    return Error{.msg = "Msg length incorrect"};
-  }
-  std::string msg(reinterpret_cast<const char*>(buffer.data() + idx), *nbytes);
-  idx += *nbytes;
+  auto [size, msg] = *value;
 
   return Response{.status = static_cast<Status>(*status),
                   .msg = std::move(msg)};
@@ -109,11 +120,7 @@ std::vector<std::byte> serialise(Request req) {
             write_le<decltype(ProtocolHeader::magic)>(out, PROTOCOL_MAGIC);
             write_le<std::underlying_type_t<decltype(ProtocolHeader::cmd)>>(
                 out, static_cast<uint8_t>(Command::GET));
-            write_le<uint32_t>(out, static_cast<uint32_t>(cmd.key.size()));
-            out.insert(out.end(),
-                       reinterpret_cast<const std::byte*>(cmd.key.data()),
-                       reinterpret_cast<const std::byte*>(cmd.key.data() +
-                                                          cmd.key.size()));
+            serialise_string(out, cmd.key);
             return out;
           },
           [](const SetCommand& cmd) { return std::vector<std::byte>{}; },
@@ -126,10 +133,7 @@ std::vector<std::byte> serialise(Response req) {
 
   write_le<std::underlying_type_t<decltype(Response::status)>>(
       out, static_cast<uint8_t>(req.status));
-  write_le<uint32_t>(out, static_cast<uint32_t>(req.msg.size()));
-  out.insert(
-      out.end(), reinterpret_cast<const std::byte*>(req.msg.data()),
-      reinterpret_cast<const std::byte*>(req.msg.data() + req.msg.size()));
+  serialise_string(out, req.msg);
 
   return out;
 }
