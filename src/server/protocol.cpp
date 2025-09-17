@@ -1,6 +1,5 @@
 #include "protocol.hpp"
 #include "server/common.hpp"
-#include <iostream>
 #include <optional>
 #include <string_view>
 #include <variant>
@@ -83,10 +82,33 @@ ParseReqResult parse_request(const std::vector<std::byte>& buffer) {
       idx += nbytes;
       return std::make_pair(idx, GetCommand{.key = std::move(key)});
     }
-    case Command::SET:
-      return std::make_pair(idx, SetCommand{.key = "", .value = ""});
-    case Command::DELETE:
-      return std::make_pair(idx, DeleteCommand{.key = ""});
+    case Command::SET: {
+      auto key_value = parse_string(buffer, idx);
+      if (!key_value) {
+        return Incomplete{};
+      }
+      auto [nbytes_key, key] = *key_value;
+      idx += nbytes_key;
+
+      auto value_value = parse_string(buffer, idx);
+      if (!value_value) {
+        return Incomplete{};
+      }
+      auto [nbytes_value, value] = *value_value;
+      idx += nbytes_value;
+      return std::make_pair(
+          idx, SetCommand{.key = std::move(key), .value = std::move(value)});
+    }
+    case Command::DELETE: {
+      auto key_value = parse_string(buffer, idx);
+      if (!key_value) {
+        return Incomplete{};
+      }
+      auto [nbytes, key] = *key_value;
+      idx += nbytes;
+      return std::make_pair(idx, DeleteCommand{.key = std::move(key)});
+    }
+
     default:
       return Error{.msg = "Unrecognised command"};
   }
@@ -117,14 +139,33 @@ std::vector<std::byte> serialise(Request req) {
       overloads{
           [](const GetCommand& cmd) {
             std::vector<std::byte> out;
+
             write_le<decltype(ProtocolHeader::magic)>(out, PROTOCOL_MAGIC);
             write_le<std::underlying_type_t<decltype(ProtocolHeader::cmd)>>(
                 out, static_cast<uint8_t>(Command::GET));
             serialise_string(out, cmd.key);
             return out;
           },
-          [](const SetCommand& cmd) { return std::vector<std::byte>{}; },
-          [](const DeleteCommand& cmd) { return std::vector<std::byte>{}; }},
+          [](const SetCommand& cmd) {
+            std::vector<std::byte> out;
+
+            write_le<decltype(ProtocolHeader::magic)>(out, PROTOCOL_MAGIC);
+            write_le<std::underlying_type_t<decltype(ProtocolHeader::cmd)>>(
+                out, static_cast<uint8_t>(Command::SET));
+            serialise_string(out, cmd.key);
+            serialise_string(out, cmd.value);
+            return out;
+          },
+          [](const DeleteCommand& cmd) {
+            std::vector<std::byte> out;
+
+            write_le<decltype(ProtocolHeader::magic)>(out, PROTOCOL_MAGIC);
+            write_le<std::underlying_type_t<decltype(ProtocolHeader::cmd)>>(
+                out, static_cast<uint8_t>(Command::DELETE));
+            serialise_string(out, cmd.key);
+            return out;
+            ;
+          }},
       req);
 }
 

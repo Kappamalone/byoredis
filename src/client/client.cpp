@@ -2,7 +2,6 @@
 #include "../server/common.hpp"
 #include "../server/protocol.hpp"
 #include <cstring>
-#include <iostream>
 #include <vector>
 
 namespace byoredis {
@@ -29,18 +28,11 @@ ResultVoid Client::connect(int32_t host, int16_t port) {
   return ok();
 }
 
-// a request is defined by:
-// uint32_t command type (defined in protocol.hpp)
-// uint32_t num bytes for string
-// ... string bytes
-Response Client::get(std::string key) {
-  GetCommand cmd{.key = key};
+Response Client::hit_server(Request cmd) {
   std::vector<std::byte> payload = serialise(cmd);
   write(server_fd.get(), payload.data(), payload.size());
-
   std::vector<std::byte> buffer;
   buffer.resize(1024);
-  std::cout << "reading from server\n";
   ssize_t n = read(server_fd.get(), buffer.data(), buffer.size());
   if (n < 0) {
     return {.status = Status::ERROR, .msg = "failed to read"};
@@ -53,6 +45,21 @@ Response Client::get(std::string key) {
   }
 
   return std::get<Response>(result);
+}
+
+Response Client::get(std::string key) {
+  GetCommand cmd{.key = key};
+  return hit_server(cmd);
+}
+
+Response Client::set(std::string key, std::string value) {
+  SetCommand cmd{.key = key, .value = value};
+  return hit_server(cmd);
+}
+
+Response Client::del(std::string key) {
+  DeleteCommand cmd{.key = key};
+  return hit_server(cmd);
 }
 
 } // namespace byoredis

@@ -3,7 +3,6 @@
 #include "redis_handler.hpp"
 #include "server/protocol.hpp"
 #include <cstring>
-#include <iostream>
 #include <unistd.h>
 #include <variant>
 
@@ -57,7 +56,7 @@ ConnState Reading::handle() {
                     return Control::Request;
                   },
                   [&](const Incomplete&) { return Control::Incomplete; },
-                  [&](const Error& err) { return Control::Error; }},
+                  [&](const Error&) { return Control::Error; }},
         req);
     switch (ctrl) {
       case Control::Request:

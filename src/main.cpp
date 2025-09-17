@@ -25,6 +25,11 @@ int main(int argc, char** argv) {
     byoredis::Client client{};
     client.connect(INADDR_LOOPBACK, 3000);
     std::cout << client.get("test").msg << "\n";
+    std::cout << client.set("test", "hello world").msg << "\n";
+    std::cout << client.get("test").msg << "\n";
+    std::cout << client.del("test").msg << "\n";
+    std::cout << client.get("test").msg << "\n";
+    std::cout << "done!\n";
   }
   return 0;
 }
